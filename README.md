@@ -483,7 +483,7 @@ curl http://localhost:8080/api/risk-summary | jq
 
 ```json
 {
-  "fleetName": "R4_Advanced_JMS",
+  "fleetName": "Advanced_JMS_log",
   "totalManagedInstances": 2,
   "overallRiskScore": 92,
   "criticalCount": 0,
