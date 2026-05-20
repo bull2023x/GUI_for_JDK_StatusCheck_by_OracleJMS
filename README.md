@@ -1,4 +1,3 @@
-以下、`README.md` としてそのまま使える全文です。
 
 ````markdown
 # GUI_for_JDK_StatusCheck_by_OracleJMS
