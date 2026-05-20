@@ -162,7 +162,7 @@ Phase 1:
 現在の画面例では、以下のような情報を表示しています。
 
 ```text
-Fleet: R4_Advanced_JMS
+Fleet: Advanced_JMS_log
 
 Overall Risk Score: 92
 Managed Instances: 2
@@ -371,7 +371,7 @@ cat ~/jms-json-export/fleets.json | jq '.data.items[] | {name: ."display-name", 
 
 ```json
 {
-  "name": "R4_Advanced_JMS",
+  "name": "Advanced_JMS_log",
   "id": "ocid1.jmsfleet.oc1.iad.xxxxx",
   "state": "ACTIVE"
 }
@@ -382,7 +382,7 @@ cat ~/jms-json-export/fleets.json | jq '.data.items[] | {name: ."display-name", 
 ### 4. 対象FleetのOCIDを取得
 
 ```bash
-export FLEET_ID=$(cat ~/jms-json-export/fleets.json | jq -r '.data.items[] | select(."display-name"=="R4_Advanced_JMS") | .id')
+export FLEET_ID=$(cat ~/jms-json-export/fleets.json | jq -r '.data.items[] | select(."display-name"=="Advanced_JMS_log") | .id')
 
 echo "$FLEET_ID"
 ```
@@ -647,7 +647,7 @@ GET /api/risk-summary
 
 ```json
 {
-  "fleetName": "R4_Advanced_JMS",
+  "fleetName": "Advanced_JMS_log",
   "totalManagedInstances": 2,
   "overallRiskScore": 92,
   "criticalCount": 0,
