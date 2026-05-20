@@ -82,8 +82,24 @@ React UIで視覚的に表現できる
 
 この最小構成をベースに、Phase 2以降でアップロード機能、CLI自動化、AI分析、OCI SDK連携へ発展させます。
 
----
+## 重要: JMS JSONデータについて
 
+このリポジトリには、実際の JMS JSON データは含めていません。
+
+理由は、JMS から取得した JSON には以下のような環境固有情報が含まれる可能性があるためです。
+
+```text
+Compartment OCID
+Fleet OCID
+Managed Instance OCID
+ホスト名
+IPアドレス
+OS情報
+Java Runtime情報
+アプリケーション数
+JRE数
+
+---
 ## 目的
 
 Oracle JMS のコンソールでは、Managed Instance、Java Runtime、Applications、Java Libraries などの情報を確認できます。
