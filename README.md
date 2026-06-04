@@ -45,49 +45,33 @@ Phase 5:
 
 ---
 
-## Phase 1 の位置付け
+## 現在の位置付け
 
-現在の実装は **Phase 1** です。
+現在の実装は **Phase 5** です。
 
-Phase 1 は、最も基本的な PoC です。
+Phase 1 の基本PoCから始まり、JSONアップロード、OCI CLI Export、classpath自動読込、AI分析、OCI SDKによるJMS直接同期まで実装済みです。
 
-具体的には、Oracle JMS から OCI CLI を使って JSON ファイルをダウンロードし、その JSON ファイルを Spring Boot アプリケーションに読み込ませ、React 画面で可視化します。
+現在は、用途に応じて以下の3通りでJMSデータを取り込めます。
+
+```text
+1. Web画面から managed-instances.json / fleets.json をアップロード
+2. scripts/export-jms-data.sh でOCI CLIからJSON Export
+3. /api/oci/sync でOCI Java SDKからJMS Managed Instance Usageを直接取得
+```
+
+Phase 5 時点の基本構成は以下です。
 
 ```text
 Oracle JMS
-  ↓ OCI CLI
-fleets.json / managed-instances.json
-  ↓ 手動コピー
+  ↓ OCI SDK / OCI CLI / JSON Upload
 Spring Boot
   ↓ REST API
 React / Vite
   ↓
-Java Runtime Risk Map
+Java Runtime Risk Map + AI Fleet Analysis
 ```
 
-この Phase 1 では、まだ以下は行いません。
-
-```text
-JMS APIへの直接接続
-OCI SDK連携
-画面からのJSONアップロード
-AIによる自然文分析
-DB永続化
-認証機能
-```
-
-Phase 1 の目的は、まず **JMSの実データをJSONとして取得し、それをWebアプリで読み込み、Java Runtime / JDK の状態を視覚化できることを確認する** ことです。
-
-つまり、Phase 1 は以下を証明するためのPoCです。
-
-```text
-JMSのデータは取得できる
-取得したデータはSpring Bootで処理できる
-Java Runtimeの状態はリスクスコア化できる
-React UIで視覚的に表現できる
-```
-
-この最小構成をベースに、Phase 2以降でアップロード機能、CLI自動化、AI分析、OCI SDK連携へ発展させます。
+DB永続化と認証機能はまだ実装していません。現在のデータはSpring Bootプロセス内メモリ、または `backend/src/main/resources/jms-data/` のJSONファイルから読み込まれます。
 
 ---
 
@@ -180,7 +164,7 @@ React UI でリスクマップ表示
 
 ## 現在の実装状況
 
-現時点では、Phase 1 に加えて Phase 2 の基本アップロード機能が実装されています。
+現時点では、Phase 1 から Phase 5 まで実装済みです。
 
 ```text
 Phase 1:
@@ -920,7 +904,7 @@ lsof -ti :5175 | xargs kill -9
 
 ## リスクスコアの考え方
 
-現在の Phase 1 では、簡易的なルールベースでリスクスコアを計算しています。
+現在は、簡易的なルールベースでリスクスコアを計算しています。
 
 例：
 
@@ -1231,32 +1215,27 @@ Maven 3.6.3 以上が必要です。Oracle Linux 8 の場合は、本 README の
 
 ---
 
-## 今後の拡張予定
-
-今後は以下を追加予定です。
+## 実装済み機能と今後の拡張予定
 
 ### Phase 2: JSONアップロード機能
 
-現在は `managed-instances.json` を resources 配下に手動コピーしています。
-
-将来的には、画面から以下をアップロードできるようにします。
+実装済みです。画面から以下をアップロードできます。
 
 ```text
 fleets.json
 managed-instances.json
-jre-usage.json
 ```
 
 ---
 
 ### Phase 3: OCI CLI Export Script
 
-JMSデータ取得をワンコマンド化します。
+実装済みです。JMSデータ取得をワンコマンド化しています。
 
 例：
 
 ```bash
-./export-jms-json.sh
+./scripts/export-jms-data.sh --compartment-id "ocid1..." --fleet-id "ocid1..."
 ```
 
 ---
@@ -1278,7 +1257,7 @@ Ollamaが起動している場合はローカルLLMで自然文の分析・推�
 
 ### Phase 5: JMS API / OCI SDK 直接連携
 
-最終的には JSON ファイル手動取得ではなく、Spring Boot から OCI SDK / API を使って JMS データを直接取得する構成を目指します。
+実装済みです。JSONファイル手動取得だけでなく、Spring BootからOCI SDKを使ってJMS Managed Instance Usageを直接取得できます。
 
 ```text
 Spring Boot
@@ -1288,6 +1267,18 @@ OCI SDK
 Oracle JMS
   ↓
 リアルタイム可視化
+```
+
+---
+
+### 今後の候補
+
+```text
+DB永続化
+認証機能
+複数Fleetの横断表示
+定期同期スケジューラ
+CSV / Excel Export
 ```
 
 ---
