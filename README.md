@@ -20,18 +20,27 @@ Phase 1:
 
 Phase 2:
   Web画面からJMS JSONファイルをアップロードできるようにする
+  現在はメモリ保持方式で実装済み
 
 Phase 3:
   OCI CLIによるJMSデータ取得をスクリプト化し、
   ワンコマンドでJSON Exportできるようにする
+  現在は scripts/export-jms-data.sh として実装済み
+
+Phase 3.5:
+  ExportしたJSONをbackend resourcesへコピーし、
+  Backend起動時に自動読込できるようにする
+  現在は --copy-to-resources で実装済み
 
 Phase 4:
   Spring AI / Ollama を使い、
   ルールベースではなくAIによる自然文の分析・推奨アクションを生成する
+  現在はOllama連携 + ルールベースFallbackとして実装済み
 
 Phase 5:
   Spring BootからOCI SDK / JMS APIを直接呼び出し、
   JSONファイルを手動で扱わずにJMSデータを取得・可視化する
+  現在は /api/oci/sync と画面のOCI JMS Direct Syncとして実装済み
 ```
 
 ---
@@ -171,7 +180,7 @@ React UI でリスクマップ表示
 
 ## 現在の実装状況
 
-現時点では、以下の Phase 1 が完了しています。
+現時点では、Phase 1 に加えて Phase 2 の基本アップロード機能が実装されています。
 
 ```text
 Phase 1:
@@ -179,7 +188,39 @@ Phase 1:
   Spring BootでJSON読み込み
   リスクスコアを計算
   Reactでリスクマップ表示
+
+Phase 2:
+  Web画面から managed-instances.json / fleets.json をアップロード
+  アップロード後にリスクサマリーと一覧を再計算
+  アップロードデータはSpring Bootプロセス内メモリに保持
+
+Phase 3:
+  scripts/export-jms-data.sh でOCI CLIから fleets.json / managed-instances.json を取得
+  Fleet名またはFleet OCIDを指定してワンコマンドExport
+  取得したJSONをPhase 2の画面アップロードで利用
+
+Phase 3.5:
+  --copy-to-resources で取得JSONを backend/src/main/resources/jms-data/ に配置
+  Backend再起動後、画面を開くだけでclasspath上のJSONを自動読込
+
+Phase 4:
+  /api/ai-analysis でFleet全体の自然文分析を生成
+  Ollamaが起動している場合はローカルLLMで分析
+  Ollamaが未起動の場合はルールベース分析へ自動Fallback
+
+Phase 5:
+  /api/oci/sync でOCI Java SDKからJMS Managed Instance Usageを直接取得
+  画面のOCI JMS Direct SyncからCompartment/Fleet OCIDを指定して同期
+  同期後はJSONファイルを介さずDashboardへ即反映
 ```
+
+Phase 2 のアップロードデータはDBやファイルには保存しません。Spring Bootを再起動すると、従来通り `backend/src/main/resources/jms-data/` 配下のJSON読み込みに戻ります。
+
+Phase 3 のExport結果は `jms-json-export/` に出力されます。このディレクトリは実JMSデータを含むためGit管理対象外です。Phase 3.5 でコピーする `backend/src/main/resources/jms-data/*.json` もGit管理対象外です。
+
+Phase 4 のAI分析はローカルOllamaを優先します。Ollamaが利用できない場合でも、画面とAPIはルールベース分析を返します。
+
+Phase 5 の直接同期は、ローカルの `~/.oci/config` とAPI keyを使います。OCI CLIで認証済みの環境であれば、通常は同じ `DEFAULT` profileを利用できます。
 
 現在の画面例では、以下のような情報を表示しています。
 
@@ -256,6 +297,8 @@ engine.lab.local
 - Maven
 - Jackson
 - REST API
+- Java HttpClientによるOllama連携
+- OCI Java SDKによるJMS API連携
 
 ### Frontend
 
@@ -514,6 +557,18 @@ JSON形式でリージョン一覧が返れば成功です。
 
 ## JMS Fleet データを取得する
 
+Phase 3 では、OCI CLIによるJSON取得を `scripts/export-jms-data.sh` にまとめています。
+
+このスクリプトは以下を実行します。
+
+```text
+1. JMS Fleet一覧を取得して jms-json-export/fleets.json に保存
+2. Fleet名またはFleet OCIDから対象Fleetを決定
+3. Managed Instance Usageを取得して jms-json-export/managed-instances.json に保存
+```
+
+取得したJSONは、React画面上部の **JMS JSON Upload** からそのままアップロードできます。
+
 ### 1. Compartment OCID を設定
 
 JMS Fleet が存在する Compartment の OCID を設定します。
@@ -532,80 +587,105 @@ echo "$COMPARTMENT_ID"
 
 ---
 
-### 2. 出力ディレクトリを作成
+### 2. スクリプトでJSONをExport
+
+Fleet名を指定する場合：
+
+```bash
+./scripts/export-jms-data.sh \
+  --compartment-id "$COMPARTMENT_ID" \
+  --fleet-name "Advanced_JMS_log"
+```
+
+Fleet OCIDを直接指定する場合：
+
+```bash
+./scripts/export-jms-data.sh \
+  --compartment-id "$COMPARTMENT_ID" \
+  --fleet-id "ocid1.jmsfleet.oc1.iad.xxxxx"
+```
+
+OCI CLI profileやregionを指定する場合：
+
+```bash
+./scripts/export-jms-data.sh \
+  --compartment-id "$COMPARTMENT_ID" \
+  --fleet-name "Advanced_JMS_log" \
+  --profile DEFAULT \
+  --region us-ashburn-1
+```
+
+確認：
+
+```bash
+ls -lh jms-json-export
+jq '.data.items | length' jms-json-export/managed-instances.json
+```
+
+出力されるファイル：
+
+```text
+jms-json-export/fleets.json
+jms-json-export/managed-instances.json
+```
+
+---
+
+### 3. 取得JSONを画面からアップロード
+
+Backend / Frontend を起動後、React画面上部の **JMS JSON Upload** で以下を選択します。
+
+```text
+managed-instances.json -> jms-json-export/managed-instances.json
+fleets.json            -> jms-json-export/fleets.json
+```
+
+`Upload JSON` を押すと、リスクサマリーとRuntime Inventoryが再計算されます。
+
+---
+
+### 4. 従来通りresourcesへコピーする場合
+
+Phase 3.5 として、Spring Boot起動時にclasspathから自動読込させたい場合は、`--copy-to-resources` を付けます。
+
+```bash
+./scripts/export-jms-data.sh \
+  --compartment-id "$COMPARTMENT_ID" \
+  --fleet-name "Advanced_JMS_log" \
+  --copy-to-resources
+```
+
+コピー先：
+
+```text
+backend/src/main/resources/jms-data/fleets.json
+backend/src/main/resources/jms-data/managed-instances.json
+```
+
+この状態でBackendを再起動すると、ブラウザで画面を開いた時点でJSONデータが表示されます。画面上のUpload JSONは、別のJSONに差し替えたい場合に使います。
+
+---
+
+### 5. 手動で取得する場合
+
+スクリプトを使わず手動で取得する場合は、以下を実行します。
 
 ```bash
 mkdir -p ~/jms-json-export
-```
-
----
-
-### 3. Fleet一覧をJSONで取得
-
-複数行コマンドがうまく貼れない場合に備えて、1行コマンドで記載します。
-
-```bash
 oci jms fleet list --compartment-id "$COMPARTMENT_ID" --all --output json > ~/jms-json-export/fleets.json
 ```
 
-確認：
-
-```bash
-cat ~/jms-json-export/fleets.json | jq '.data.items[] | {name: ."display-name", id: .id, state: ."lifecycle-state"}'
-```
-
-例：
-
-```json
-{
-  "name": "Advanced_JMS_log",
-  "id": "ocid1.jmsfleet.oc1.iad.xxxxx",
-  "state": "ACTIVE"
-}
-```
-
----
-
-### 4. 対象FleetのOCIDを取得
-
-`Advanced_JMS_log` はサンプル名です。利用者は、自分のJMS環境に存在するFleet名に置き換えてください。
+対象FleetのOCIDを取得します。
 
 ```bash
 export FLEET_NAME="Advanced_JMS_log"
+export FLEET_ID=$(cat ~/jms-json-export/fleets.json | jq -r --arg name "$FLEET_NAME" '.data.items[] | select(."display-name"==$name or .name==$name) | .id')
 ```
 
-Fleet OCID を取得します。
-
-```bash
-export FLEET_ID=$(cat ~/jms-json-export/fleets.json | jq -r --arg name "$FLEET_NAME" '.data.items[] | select(."display-name"==$name) | .id')
-```
-
-確認：
-
-```bash
-echo "$FLEET_ID"
-```
-
-`ocid1.jmsfleet...` のような値が表示されればOKです。
-
-Fleet名が分からない場合は、以下で一覧確認できます。
-
-```bash
-cat ~/jms-json-export/fleets.json | jq -r '.data.items[] | ."display-name"'
-```
-
----
-
-### 5. Managed Instance情報を取得
+Managed Instance情報を取得します。
 
 ```bash
 oci jms managed-instance-usage summarize --fleet-id "$FLEET_ID" --output json > ~/jms-json-export/managed-instances.json
-```
-
-確認：
-
-```bash
-cat ~/jms-json-export/managed-instances.json | jq '.'
 ```
 
 この JSON には、以下のような情報が含まれます。
@@ -922,6 +1002,91 @@ GET /api/managed-instances
 
 ---
 
+### AI Analysis
+
+```http
+GET /api/ai-analysis
+```
+
+Ollamaが起動している場合はローカルLLMで分析し、起動していない場合はルールベース分析を返します。
+
+環境変数でOllama接続先とモデルを変更できます。
+
+```bash
+export OLLAMA_BASE_URL="http://localhost:11434"
+export OLLAMA_MODEL="llama3.1"
+```
+
+レスポンス例：
+
+```json
+{
+  "generatedAt": "2026-06-04T08:00:00Z",
+  "provider": "ollama",
+  "model": "llama3.1",
+  "available": true,
+  "analysis": "Executive summary: ..."
+}
+```
+
+Fallback時：
+
+```json
+{
+  "provider": "rule-based",
+  "available": false,
+  "analysis": "Executive summary: ...",
+  "note": "Ollama is not available. Returned rule-based analysis."
+}
+```
+
+---
+
+### OCI JMS Direct Sync
+
+```http
+POST /api/oci/sync
+```
+
+OCI Java SDKでJMS Managed Instance Usageを直接取得し、Dashboardの現在データとして反映します。
+
+フォーム項目：
+
+```text
+compartmentId
+fleetId
+fleetName
+profile
+region
+```
+
+画面では **OCI JMS Direct Sync** の `Sync from OCI` ボタンから実行できます。
+
+CLI確認例：
+
+```bash
+curl -X POST http://localhost:8080/api/oci/sync \
+  -F compartmentId="ocid1.compartment.oc1..xxxxx" \
+  -F fleetId="ocid1.jmsfleet.oc1.iad.xxxxx" \
+  -F fleetName="Advanced_JMS_log" \
+  -F region="us-ashburn-1" | jq
+```
+
+レスポンス例：
+
+```json
+{
+  "message": "JMS data synced from OCI.",
+  "source": "oci-sdk",
+  "fleetName": "Advanced_JMS_log",
+  "managedInstanceCount": 3,
+  "profile": "DEFAULT",
+  "region": "us-ashburn-1"
+}
+```
+
+---
+
 ## トラブルシューティング
 
 ### 1. `oci iam region list` が NotAuthenticated になる
@@ -1098,9 +1263,9 @@ JMSデータ取得をワンコマンド化します。
 
 ### Phase 4: Spring AI / Ollama 連携
 
-現在の recommendation はルールベースです。
+Fleet全体の分析は `/api/ai-analysis` で実装済みです。
 
-将来的には、Spring AI と Ollama を使って、より自然な分析文を生成します。
+Ollamaが起動している場合はローカルLLMで自然文の分析・推奨アクションを生成します。Ollamaが未起動の場合は、ルールベース分析へ自動Fallbackします。
 
 例：
 

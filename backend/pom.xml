@@ -17,12 +17,23 @@
 
     <properties>
         <java.version>17</java.version>
+        <oci-java-sdk.version>3.87.0</oci-java-sdk.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-jms</artifactId>
+            <version>${oci-java-sdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-common-httpclient-jersey3</artifactId>
+            <version>${oci-java-sdk.version}</version>
         </dependency>
     </dependencies>
 

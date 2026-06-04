@@ -12,4 +12,5 @@ frontend/dist/
 *.log
 
 # Local JMS exported data
+jms-json-export/
 backend/src/main/resources/jms-data/*.json
