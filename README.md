@@ -492,6 +492,55 @@ backend/src/main/resources/jms-data/managed-instances.json
 7. ブラウザで http://localhost:5173 を開く
 ```
 
+macOSでは、以下のDesktop Launcherを使うと、Backend / Frontend の起動とブラウザ表示をまとめて実行できます。
+
+---
+
+## macOS Desktop Launcher
+
+macOSでは、プロジェクト直下の以下をダブルクリックするとWebAppを起動できます。
+
+```text
+JMS Data Viewer.command
+```
+
+このランチャーは以下を自動実行します。
+
+```text
+1. Spring Boot Backend を http://127.0.0.1:8080 で起動
+2. React / Vite Frontend を http://127.0.0.1:5173 で起動
+3. ブラウザで http://127.0.0.1:5173 を開く
+```
+
+ターミナルから実行する場合：
+
+```bash
+./scripts/launch-desktop.sh
+```
+
+終了する場合は、ランチャーが開いたTerminalで `Ctrl-C` を押します。このランチャーが起動したBackend / Frontendプロセスを停止します。
+
+Finder上で `.app` として表示したい場合は、以下を一度実行します。
+
+```bash
+./scripts/create-macos-app.sh
+```
+
+作成後、プロジェクト直下に以下ができます。
+
+```text
+JMS Data Viewer.app
+```
+
+以後は `JMS Data Viewer.app` をダブルクリックして起動できます。
+
+注意:
+
+```text
+Backend用の8080番ポート、Frontend用の5173番ポートが既に別プロセスで使われている場合は起動を停止します。
+その場合は既存プロセスを停止してから再実行してください。
+```
+
 ---
 
 ## OCI CLI のセットアップ

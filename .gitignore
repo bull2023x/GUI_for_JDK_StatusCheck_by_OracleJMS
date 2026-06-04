@@ -10,6 +10,8 @@ frontend/dist/
 
 # Logs
 *.log
+.desktop-run/
+*.app/
 
 # Local JMS exported data
 jms-json-export/
