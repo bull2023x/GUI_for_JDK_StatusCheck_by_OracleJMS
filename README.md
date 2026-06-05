@@ -1400,21 +1400,14 @@ CSV / Excel Export
 ```text
 JMSドキュメントに対するRAG / AI Chatbox
 ```
-
-### GUI_for_JDK_StatusCheck_by_OracleJMS
-
-```text
-JMS実データを使ったJDK / Java Runtime状態の可視化Webアプリ
-```
-
-つまり、本プロジェクトは Chatbox ではなく、JMSデータを利用した Visual Intelligence / Risk Dashboard です。
+本プロジェクトは Chatbox ではなく、JMSデータを利用した Visual Intelligence / Risk Dashboard です。
 
 ---
 
 ## Repository Name
 
 ```text
-GUI_for_JDK_StatusCheck_by_OracleJMS
+OracleJMS_AI_analysis
 ```
 
 ---
