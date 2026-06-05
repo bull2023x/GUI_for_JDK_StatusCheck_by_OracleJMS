@@ -2,7 +2,9 @@
 
 Oracle Java Management Service（JMS）から取得した実データを使い、企業内の Java Runtime / JDK 状態を視覚的に確認するための Web アプリケーションです。
 
-本プロジェクトでは、OCI CLI を使って Oracle JMS の Fleet / Managed Instance 情報を JSON として取得し、Spring Boot バックエンドでリスクスコアを計算し、React フロントエンドでリスクマップとして表示します。
+本プロジェクトは、単なる JMS JSON 可視化ツールではなく、**Oracle JMS の実データを使った Java Fleet Visual Intelligence / Risk Dashboard** です。Spring Boot バックエンドが JMS Managed Instance 情報を取り込み、リスクスコアを計算し、React フロントエンドで Fleet 全体の状態、Runtime Inventory、Risk Map、AI 推奨アクションを表示します。
+
+現在の実装では、従来の JSON Upload / OCI CLI Export に加えて、画面から **Compartment OCID / Fleet OCID / Fleet Name** を入力し、OCI Java SDK 経由で JMS データを直接同期できる **OCI JMS Direct Sync** に対応しています。また、同期された最新データをもとに、Fleet 全体のリスク傾向や優先対応ホストを示す **リアルタイム AI 推奨機能** も利用できます。
 
 ---
 
@@ -49,14 +51,29 @@ Phase 5:
 
 現在の実装は **Phase 5** です。
 
-Phase 1 の基本PoCから始まり、JSONアップロード、OCI CLI Export、classpath自動読込、AI分析、OCI SDKによるJMS直接同期まで実装済みです。
-
-現在は、用途に応じて以下の3通りでJMSデータを取り込めます。
+当初の JSON ベース PoC から大きく進み、現在は以下の両方に対応しています。
 
 ```text
-1. Web画面から managed-instances.json / fleets.json をアップロード
-2. scripts/export-jms-data.sh でOCI CLIからJSON Export
-3. /api/oci/sync でOCI Java SDKからJMS Managed Instance Usageを直接取得
+1. JMS JSON Upload / Local JSON Visualization
+   - managed-instances.json / fleets.json を画面からアップロード
+   - ローカルJSONを使ったオフライン分析・可視化
+
+2. OCI JMS Direct Sync
+   - Compartment OCID / Fleet OCID / Fleet Name を画面から入力
+   - OCI Java SDKを使ってJMS Managed Instance Usageを直接取得
+   - JSONファイルを手動で扱わず、Dashboardへ即時反映
+```
+
+さらに、同期された JMS 実データをもとに、以下のような **リアルタイム AI 推奨機能** を提供します。
+
+```text
+- Fleet全体のExecutive Summary
+- Overall Risk Score
+- Top Risk Hostの特定
+- Critical / High / Medium / Low の分類
+- Java Runtime / Security Status / Application Count に基づく推奨対応
+- Ollama連携によるローカルLLM分析
+- Ollama未起動時のルールベースFallback分析
 ```
 
 Phase 5 時点の基本構成は以下です。
@@ -65,13 +82,13 @@ Phase 5 時点の基本構成は以下です。
 Oracle JMS
   ↓ OCI SDK / OCI CLI / JSON Upload
 Spring Boot
-  ↓ REST API
+  ↓ Risk Scoring + AI Recommendation API
 React / Vite
   ↓
-Java Runtime Risk Map + AI Fleet Analysis
+Java Runtime Risk Map + Runtime Inventory + AI Fleet Analysis
 ```
 
-DB永続化と認証機能はまだ実装していません。現在のデータはSpring Bootプロセス内メモリ、または `backend/src/main/resources/jms-data/` のJSONファイルから読み込まれます。
+DB永続化と認証機能はまだ実装していません。現在のデータは、Spring Bootプロセス内メモリ、OCI JMS Direct Sync結果、または `backend/src/main/resources/jms-data/` のJSONファイルから読み込まれます。
 
 ---
 
@@ -95,7 +112,9 @@ JRE数
 
 そのため、`backend/src/main/resources/jms-data/` 配下の JSON ファイルは `.gitignore` により Git 管理対象外にしています。
 
-利用者は、自分の OCI / JMS 環境から以下の2つの JSON ファイルを取得し、ローカル環境に配置する必要があります。
+JSONファイルを使う場合、利用者は自分の OCI / JMS 環境から以下の2つの JSON ファイルを取得し、ローカル環境に配置します。
+
+ただし、現在の実装では **OCI JMS Direct Sync** に対応しているため、画面から Compartment OCID / Fleet OCID / Fleet Name を入力して同期する場合は、JSONファイルを手動で配置しなくても利用できます。
 
 ```text
 backend/src/main/resources/jms-data/fleets.json
@@ -138,13 +157,15 @@ Oracle JMS のコンソールでは、Managed Instance、Java Runtime、Applicat
 ```text
 Oracle JMS 実データ
   ↓
-OCI CLI で JSON 取得
+OCI JMS Direct Sync / OCI CLI Export / JSON Upload
   ↓
-Spring Boot が JSON を読み込み
+Spring Boot が JMSデータを読み込み
   ↓
 Java Runtime / Security Status / Application Count からリスク計算
   ↓
-React UI でリスクマップ表示
+AI分析またはルールベース分析で推奨アクションを生成
+  ↓
+React UI でリスクマップ、Runtime Inventory、AI Fleet Analysisを表示
 ```
 
 最終的には、JMS のデータを単なる一覧表ではなく、以下のような形で表示します。
@@ -159,6 +180,8 @@ React UI でリスクマップ表示
 - JRE数
 - アプリケーション数
 - 推奨対応アクション
+- AIによるFleet全体のExecutive Summary
+- AIによる優先対応ホストの提示
 
 ---
 
@@ -241,20 +264,16 @@ engine.lab.local
 | Service / JMS Fleet         |
 +-------------+---------------+
               |
-              | OCI CLI
-              v
-+-----------------------------+
-| fleets.json                 |
-| managed-instances.json      |
-+-------------+---------------+
-              |
-              | read from resources
+              | OCI SDK Direct Sync
+              | OCI CLI Export
+              | JSON Upload
               v
 +-----------------------------+
 | Spring Boot Backend         |
 |                             |
-| - JSON読み込み              |
+| - JMSデータ読み込み         |
 | - リスクスコア計算          |
+| - AI / Rule-based分析       |
 | - REST API提供              |
 +-------------+---------------+
               |
@@ -267,6 +286,8 @@ engine.lab.local
 | - Runtime Risk Map          |
 | - Selected Instance Detail  |
 | - Runtime Inventory         |
+| - AI Fleet Analysis         |
+| - OCI JMS Direct Sync UI    |
 +-----------------------------+
 ```
 
@@ -1120,6 +1141,41 @@ curl -X POST http://localhost:8080/api/oci/sync \
 
 ---
 
+## リアルタイムAI推奨機能
+
+本アプリは、JMSから取得したManaged Instance情報をもとに、Fleet全体の状態を自然文で要約し、優先的に確認すべきホストや推奨対応を提示します。
+
+AI推奨機能では、以下の情報を分析に利用します。
+
+```text
+Fleet名
+Managed Instance数
+Java Runtime Version
+Java Security Status
+Application Count
+Installation Count
+JRE Count
+OS情報
+Risk Score
+Risk Level
+Top Risk Host
+```
+
+Ollamaが起動している場合は、ローカルLLMを使ってより自然な分析文を生成します。Ollamaが利用できない場合でも、アプリは自動的にルールベース分析へFallbackし、画面上にはExecutive Summaryと推奨アクションが表示されます。
+
+このため、ユーザーはOCI JMS Consoleの一覧情報を見るだけでなく、以下のような判断をDashboard上で素早く行えます。
+
+```text
+どのホストを最初に確認すべきか
+Java 8 / UPDATE_REQUIRED の影響範囲はどこか
+Fleet全体としてCritical / High / Medium / Low がどの程度存在するか
+アプリケーション数が多いホストはどれか
+更新・パッチ適用・検証をどの順番で進めるべきか
+```
+
+特に OCI JMS Direct Sync と組み合わせることで、Compartment OCID / Fleet OCID / Fleet Name を入力するだけで、最新のJMS状態を取得し、リスク可視化とAI推奨を同じ画面で確認できます。
+
+
 ## トラブルシューティング
 
 ### 1. `oci iam region list` が NotAuthenticated になる
@@ -1316,6 +1372,8 @@ OCI SDK
 Oracle JMS
   ↓
 リアルタイム可視化
+  ↓
+AI Fleet Analysis / 推奨アクション生成
 ```
 
 ---
