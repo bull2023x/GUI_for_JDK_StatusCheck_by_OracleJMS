@@ -1,4 +1,5 @@
-# GUI_for_JDK_StatusCheck_by_OracleJMS
+# OracleJMS_AI_analysis
+
 
 Oracle Java Management Service（JMS）から取得した実データを使い、企業内の Java Runtime / JDK 状態を視覚的に確認するための Web アプリケーションです。
 
