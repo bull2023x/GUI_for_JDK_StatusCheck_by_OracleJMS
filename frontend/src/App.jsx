@@ -9,6 +9,10 @@ function riskColor(level) {
   return '#22c55e'
 }
 
+function runtimeLabel(runtime) {
+  return [runtime.version, runtime.distribution].filter(Boolean).join(' · ') || 'Unknown runtime'
+}
+
 function App() {
   const [summary, setSummary] = useState(null)
   const [instances, setInstances] = useState([])
@@ -378,7 +382,7 @@ function App() {
 
               <div className="detail-grid">
                 <div>
-                  <span>Java Version</span>
+                  <span>Agent Java Version</span>
                   <strong>{selected.javaVersion}</strong>
                 </div>
                 <div>
@@ -401,6 +405,26 @@ function App() {
                   <span>Risk Score</span>
                   <strong>{selected.riskScore}</strong>
                 </div>
+              </div>
+
+              <div className="installations">
+                <div className="section-title">
+                  <Cpu size={18} />
+                  Installed Java Runtimes ({selected.javaInstallations?.length ?? 0})
+                </div>
+                {selected.javaInstallations?.length ? (
+                  <div className="installation-list">
+                    {selected.javaInstallations.map((runtime, index) => (
+                      <div className="installation-row" key={`${runtime.path}-${runtime.version}-${index}`}>
+                        <strong>{runtimeLabel(runtime)}</strong>
+                        <span>{runtime.securityStatus || 'Security status unavailable'} · {runtime.vendor || 'Vendor unavailable'}</span>
+                        <code>{runtime.path || 'Installation path unavailable'}</code>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="installation-empty">Detailed installation inventory is available after an OCI JMS Direct Sync.</p>
+                )}
               </div>
 
               <div className="insight">
@@ -440,7 +464,11 @@ function App() {
               <tr key={item.managedInstanceId} onClick={() => setSelected(item)}>
                 <td>{item.hostname}</td>
                 <td>{item.osName}</td>
-                <td>{item.javaVersion}</td>
+                <td>
+                  {item.javaInstallations?.length
+                    ? item.javaInstallations.map((runtime) => runtime.version).filter(Boolean).join(', ')
+                    : item.javaVersion}
+                </td>
                 <td>{item.javaSecurityStatus}</td>
                 <td>{item.applicationCount}</td>
                 <td>

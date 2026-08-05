@@ -8,10 +8,13 @@ import com.oracle.bmc.Region;
 import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider;
 import com.oracle.bmc.jms.JavaManagementServiceClient;
 import com.oracle.bmc.jms.model.Agent;
+import com.oracle.bmc.jms.model.InstallationUsage;
 import com.oracle.bmc.jms.model.ManagedInstanceUsage;
 import com.oracle.bmc.jms.model.OperatingSystem;
 import com.oracle.bmc.jms.requests.SummarizeManagedInstanceUsageRequest;
+import com.oracle.bmc.jms.requests.SummarizeInstallationUsageRequest;
 import com.oracle.bmc.jms.responses.SummarizeManagedInstanceUsageResponse;
+import com.oracle.bmc.jms.responses.SummarizeInstallationUsageResponse;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -81,6 +84,7 @@ public class JmsController {
 
             String timeFirstSeen = textAny(item, "time-first-seen", "timeFirstSeen");
             String timeLastSeen = textAny(item, "time-last-seen", "timeLastSeen");
+            List<Map<String, Object>> javaInstallations = installationRows(item);
 
             int riskScore = calculateRiskScore(javaVersion, securityStatus, appCount, installationCount, jreCount);
             String riskLevel = riskLevel(riskScore, securityStatus);
@@ -100,6 +104,7 @@ public class JmsController {
             row.put("applicationCount", appCount);
             row.put("installationCount", installationCount);
             row.put("jreCount", jreCount);
+            row.put("javaInstallations", javaInstallations);
             row.put("timeFirstSeen", timeFirstSeen);
             row.put("timeLastSeen", timeLastSeen);
             row.put("riskScore", riskScore);
@@ -195,7 +200,9 @@ public class JmsController {
                         .build();
                 SummarizeManagedInstanceUsageResponse response = client.summarizeManagedInstanceUsage(request);
                 for (ManagedInstanceUsage item : response.getManagedInstanceUsageCollection().getItems()) {
-                    allItems.add(toDashboardJson(item));
+                    List<InstallationUsage> installations = summarizeInstallations(
+                            client, resolvedFleetId, item.getManagedInstanceId());
+                    allItems.add(toDashboardJson(item, installations));
                 }
                 page = response.getOpcNextPage();
             } while (page != null && !page.isBlank());
@@ -571,7 +578,49 @@ public class JmsController {
         return value == null || value.isBlank() ? defaultValue : value;
     }
 
-    private ObjectNode toDashboardJson(ManagedInstanceUsage item) {
+    private List<InstallationUsage> summarizeInstallations(
+            JavaManagementServiceClient client,
+            String fleetId,
+            String managedInstanceId
+    ) {
+        List<InstallationUsage> installations = new ArrayList<>();
+        String page = null;
+        do {
+            SummarizeInstallationUsageResponse response = client.summarizeInstallationUsage(
+                    SummarizeInstallationUsageRequest.builder()
+                            .fleetId(fleetId)
+                            .managedInstanceId(managedInstanceId)
+                            .limit(1000)
+                            .page(page)
+                            .build());
+            installations.addAll(response.getInstallationUsageCollection().getItems());
+            page = response.getOpcNextPage();
+        } while (page != null && !page.isBlank());
+        return installations;
+    }
+
+    private List<Map<String, Object>> installationRows(JsonNode item) {
+        JsonNode installationNodes = firstPresent(item, "java-installations", "javaInstallations");
+        List<Map<String, Object>> installations = new ArrayList<>();
+        if (!installationNodes.isArray()) {
+            return installations;
+        }
+
+        for (JsonNode installation : installationNodes) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("version", textAny(installation, "version", "jre-version", "jreVersion"));
+            row.put("vendor", textAny(installation, "vendor", "jre-vendor", "jreVendor"));
+            row.put("distribution", textAny(installation, "distribution", "jre-distribution", "jreDistribution"));
+            row.put("securityStatus", textAny(installation, "security-status", "securityStatus"));
+            row.put("path", text(installation, "path"));
+            row.put("architecture", text(installation, "architecture"));
+            row.put("applicationCount", intAny(installation, "approximate-application-count", "approximateApplicationCount"));
+            installations.add(row);
+        }
+        return installations;
+    }
+
+    private ObjectNode toDashboardJson(ManagedInstanceUsage item, List<InstallationUsage> installations) {
         ObjectNode node = objectMapper.createObjectNode();
         node.put("hostname", valueOrEmpty(item.getHostname()));
         node.put("managedInstanceId", valueOrEmpty(item.getManagedInstanceId()));
@@ -602,6 +651,20 @@ public class JmsController {
             osNode.put("architecture", valueOrEmpty(operatingSystem.getArchitecture()));
         }
         node.set("operatingSystem", osNode);
+
+        ArrayNode installationNodes = objectMapper.createArrayNode();
+        for (InstallationUsage installation : installations) {
+            ObjectNode installationNode = objectMapper.createObjectNode();
+            installationNode.put("version", valueOrEmpty(installation.getJreVersion()));
+            installationNode.put("vendor", valueOrEmpty(installation.getJreVendor()));
+            installationNode.put("distribution", valueOrEmpty(installation.getJreDistribution()));
+            installationNode.put("securityStatus", valueOrEmpty(installation.getSecurityStatus()));
+            installationNode.put("path", valueOrEmpty(installation.getPath()));
+            installationNode.put("architecture", valueOrEmpty(installation.getArchitecture()));
+            installationNode.put("approximateApplicationCount", valueOrZero(installation.getApproximateApplicationCount()));
+            installationNodes.add(installationNode);
+        }
+        node.set("javaInstallations", installationNodes);
 
         return node;
     }

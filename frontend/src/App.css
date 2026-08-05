@@ -405,6 +405,38 @@ input[type="text"] {
   gap: 14px;
 }
 
+.installations {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.installation-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.installation-row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem;
+  border-radius: 0.65rem;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.installation-row span,
+.installation-empty {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.installation-row code {
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
 .detail-grid div {
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 18px;

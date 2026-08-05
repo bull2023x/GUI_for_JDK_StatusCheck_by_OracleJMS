@@ -12,6 +12,8 @@ frontend/dist/
 *.log
 .desktop-run/
 *.app/
+.macos-build/
+dist/
 
 # Local JMS exported data
 jms-json-export/

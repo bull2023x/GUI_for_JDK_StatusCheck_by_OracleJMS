@@ -1,5 +1,19 @@
 # OracleJMS AI analysis app.
 
+## macOS デスクトップアプリ
+
+ブラウザや Terminal を操作せずに使える macOS ネイティブウィンドウ版を用意しています。初回ビルド時に React 画面と Spring Boot バックエンドを 1 つの `.app` にまとめ、起動時にはアプリ内でローカルサービスを起動します。
+
+```bash
+cd OracleJMS_AI_analysis
+./scripts/build-macos-app.sh
+open "dist/JMS Data Viewer.app"
+```
+
+必要なものは macOS、Java 17 以上、Maven、Node.js/npm、Xcode Command Line Tools（`swiftc`）です。OCI Direct Sync は、従来どおり利用者の `~/.oci/config` と API キーを使用します。バックエンドのログは `~/Library/Logs/JMS Data Viewer/backend.log` に出力されます。
+
+開発時にブラウザ版を起動する従来の `scripts/launch-desktop.sh` もそのまま利用できます。
+
 
 Oracle Java Management Service（JMS）から取得した実データを使い、企業内の Java Runtime / JDK 状態を視覚的に確認するための Web アプリケーションです。
 
